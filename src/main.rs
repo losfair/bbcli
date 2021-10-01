@@ -78,7 +78,9 @@ async fn main() -> Result<()> {
     Err(e) => return Err(e.into()),
   };
   let endpoint = Url::from_str(&opt.endpoint)?;
-  let secret = derive_secret_key_for_server(&secret, &endpoint.host_str().expect("bad url"));
+  let origin = endpoint.origin().ascii_serialization();
+  log::debug!("origin is {}", origin);
+  let secret = derive_secret_key_for_server(&secret, &origin);
   let secret = ed25519_dalek::SecretKey::from_bytes(&secret).unwrap();
   let public = ed25519_dalek::PublicKey::from(&secret);
   let mut app = App {
@@ -159,10 +161,10 @@ impl App {
   }
 }
 
-fn derive_secret_key_for_server(main_key: &[u8; 32], host: &str) -> [u8; 32] {
+fn derive_secret_key_for_server(main_key: &[u8; 32], origin: &str) -> [u8; 32] {
   let mut hasher = Sha512::new();
   hasher.update(main_key);
-  hasher.update(host.as_bytes());
+  hasher.update(origin.as_bytes());
   let out = hasher.finalize();
   <[u8; 32]>::try_from(&out[0..32]).unwrap()
 }
