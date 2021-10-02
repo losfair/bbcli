@@ -20,6 +20,7 @@ use reqwest::{
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha512};
+use std::convert::TryFrom;
 use structopt::StructOpt;
 use tempdir::TempDir;
 use thiserror::Error;
