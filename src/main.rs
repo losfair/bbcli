@@ -52,6 +52,23 @@ enum Cmd {
   /// Revoke all tokens for this user.
   Revoke,
 
+  /// Show logs.
+  Logs {
+    appid: String,
+
+    #[structopt(long)]
+    reqid: Option<String>,
+
+    #[structopt(long)]
+    before: Option<u64>,
+
+    #[structopt(long, default_value = "0")]
+    limit: u32,
+
+    #[structopt(long, default_value = "yaml")]
+    format: LogFormat,
+  },
+
   /// Deploy a project.
   Deploy {
     /// Path to the spec file.
@@ -62,6 +79,23 @@ enum Cmd {
     #[structopt(long)]
     vars: Option<PathBuf>,
   },
+}
+
+#[derive(Copy, Clone, Debug)]
+enum LogFormat {
+  Json,
+  Yaml,
+}
+
+impl FromStr for LogFormat {
+  type Err = &'static str;
+  fn from_str(x: &str) -> Result<Self, Self::Err> {
+    match x {
+      "json" => Ok(Self::Json),
+      "yaml" => Ok(Self::Yaml),
+      _ => Err("invalid log format"),
+    }
+  }
 }
 
 struct App {
@@ -212,9 +246,61 @@ impl App {
         let res: serde_json::Value = self.handle_json_response(res).await?;
         println!("{}", serde_yaml::to_string(&res)?);
       }
+      Cmd::Logs {
+        appid,
+        reqid,
+        before,
+        limit,
+        format,
+      } => {
+        self
+          .run_logs(appid, reqid, *before, *limit, *format)
+          .await?;
+      }
       Cmd::Deploy { spec, vars } => {
         self.run_deploy(spec, vars).await?;
       }
+    }
+    Ok(())
+  }
+
+  async fn run_logs(
+    &mut self,
+    appid: &str,
+    reqid: &Option<String>,
+    before: Option<u64>,
+    limit: u32,
+    format: LogFormat,
+  ) -> Result<()> {
+    #[derive(Serialize)]
+    struct LogQueryRequest<'a> {
+      appid: &'a str,
+      reqid: Option<&'a str>,
+      before: Option<u64>,
+      limit: u32,
+    }
+
+    let req = LogQueryRequest {
+      appid,
+      reqid: reqid.as_ref().map(|x| x.as_str()),
+      before,
+      limit,
+    };
+
+    self.ensure_session().await?;
+
+    let mut u = self.endpoint()?;
+    u.set_path("/ops/logs");
+    let res = self
+      .client
+      .post(u)
+      .body(serde_json::to_string(&req)?)
+      .send()
+      .await?;
+    let res: serde_json::Value = self.handle_json_response(res).await?;
+    match format {
+      LogFormat::Json => println!("{}", serde_json::to_string_pretty(&res)?),
+      LogFormat::Yaml => println!("{}", serde_yaml::to_string(&res)?),
     }
     Ok(())
   }
