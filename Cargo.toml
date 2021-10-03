@@ -1,10 +1,10 @@
 [package]
-name = "rwcli"
+name = "bbcli"
 version = "0.1.0"
 edition = "2018"
 license = "MIT"
-repository = "https://github.com/losfair/rwcli"
-description = "CLI for rwv2 (with rwcp)"
+repository = "https://github.com/losfair/bbcli"
+description = "CLI for blueboat (with bbcp)"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

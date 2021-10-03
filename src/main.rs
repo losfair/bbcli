@@ -32,9 +32,9 @@ use crate::metadata::Metadata;
 struct ServerError(StatusCode, String);
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "rwcli", about = "CLI for the RW platform")]
+#[structopt(name = "bbcli", about = "CLI for the blueboat platform")]
 struct Opt {
-  /// RWCP service endpoint.
+  /// BBCP service endpoint.
   #[structopt(long)]
   endpoint: Option<String>,
 
@@ -73,7 +73,7 @@ enum Cmd {
   /// Deploy a project.
   Deploy {
     /// Path to the spec file.
-    #[structopt(long, default_value = "./rwspec.yaml")]
+    #[structopt(long, default_value = "./bbspec.yaml")]
     spec: PathBuf,
 
     /// Path to the vars file, if any.
@@ -116,7 +116,7 @@ async fn main() -> Result<()> {
   pretty_env_logger::init_timed();
   let opt = Opt::from_args();
   let home_dir = dirs::home_dir().expect("cannot get home dir");
-  let base_dir = home_dir.join(".rwcli");
+  let base_dir = home_dir.join(".bbcli");
   std::fs::create_dir_all(&base_dir)?;
 
   let secret_file = base_dir.join("secret");
@@ -402,7 +402,7 @@ impl App {
       self.set_endpoint_if_missing(endpoint)?;
     }
 
-    let td = TempDir::new("rwcli-deploy")?;
+    let td = TempDir::new("bbcli-deploy")?;
     if let Some(d) = &spec._static {
       let d = PathBuf::from_str(d)?.canonicalize()?;
       let status = Command::new("cp")
@@ -501,7 +501,7 @@ impl App {
 
   fn reinit_client_with_session(&mut self, sid: &str) -> Result<()> {
     let mut headers = HeaderMap::new();
-    headers.insert("x-rwcp-session-id", HeaderValue::from_str(sid)?);
+    headers.insert("x-bbcp-session-id", HeaderValue::from_str(sid)?);
     self.client = reqwest::Client::builder()
       .default_headers(headers)
       .build()?;

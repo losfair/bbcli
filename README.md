@@ -1,3 +1,3 @@
-# rwcli
+# bbcli
 
-CLI for rwv2 (with [rwcp](https://github.com/losfair/rwcp)).
+CLI for blueboat (with [bbcp](https://github.com/losfair/bbcp)).
