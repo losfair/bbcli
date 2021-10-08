@@ -14,6 +14,8 @@ jobs:
         with:
           profile: minimal
           toolchain: stable
+      - name: Install musl-tools
+        run: sudo apt install musl-tools
       - name: Add target
         run: rustup target add x86_64-unknown-linux-musl
       - name: Build
