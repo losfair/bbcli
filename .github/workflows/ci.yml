@@ -1,0 +1,43 @@
+name: bbcli.build
+on:
+- push
+
+jobs:
+  build-linux:
+    name: Build (Linux)
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - name: Add target
+        run: rustup target add x86_64-unknown-linux-musl
+      - name: Build
+        run: cargo build --release --target x86_64-unknown-linux-musl
+      - name: Upload binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: exe-linux
+          path: target/x86_64-unknown-linux-musl/release/bbcli
+  build-macos:
+    name: Build (macOS)
+    runs-on: macos-10.15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - name: Build
+        run: cargo build --release
+      - name: Upload binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: exe-macos
+          path: target/release/bbcli
