@@ -404,10 +404,23 @@ impl App {
 
     let td = TempDir::new("bbcli-deploy")?;
     if let Some(d) = &spec._static {
-      let d = PathBuf::from_str(d)?.canonicalize()?;
-      let status = Command::new("cp")
-        .args([Path::new("-rT"), &d, td.path()])
-        .status()?;
+      let status = {
+        #[cfg(target_os = "macos")]
+        {
+          let mut d = PathBuf::from_str(d)?.canonicalize()?;
+          d.push("");
+          Command::new("cp")
+            .args([Path::new("-r"), &d, td.path()])
+            .status()?
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+          let d = PathBuf::from_str(d)?.canonicalize()?;
+          Command::new("cp")
+            .args([Path::new("-rT"), &d, td.path()])
+            .status()?
+        }
+      };
       if !status.success() {
         return Err(CopyStaticFailed(status.code().unwrap_or(1)).into());
       }
