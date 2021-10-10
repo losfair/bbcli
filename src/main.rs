@@ -467,15 +467,11 @@ impl App {
       permit.image_id
     );
 
-    // https://github.com/aws/aws-sdk-go/issues/1537
-    // Seems that the JS version of the AWS SDK also does not include the port when calculating
-    // the signature. Let's do a workaround.
     let put_url = Url::from_str(&permit.url)?;
 
     let s3_client = reqwest::Client::new();
     let res = s3_client
       .put(put_url.clone())
-      .header("host", put_url.host_str().unwrap_or("nohost"))
       .header("content-type", "application/x-tar")
       .body(image)
       .send()
