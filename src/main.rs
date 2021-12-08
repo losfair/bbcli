@@ -12,7 +12,7 @@ use std::{
 
 use anyhow::Result;
 use ed25519_dalek::Signer;
-use metadata::{ApnsMetadata, MysqlMetadata};
+use metadata::{ApnsMetadata, KvNamespaceMetadata, MysqlMetadata};
 use rand::RngCore;
 use reqwest::{
   header::{HeaderMap, HeaderValue},
@@ -176,6 +176,9 @@ struct DeploySpec {
   #[serde(default)]
   apns: Vec<String>,
 
+  #[serde(default)]
+  kv_namespaces: Vec<String>,
+
   #[serde(rename = "static")]
   _static: Option<String>,
 }
@@ -195,6 +198,9 @@ struct DeployVars {
 
   #[serde(default)]
   apns: HashMap<String, ApnsMetadata>,
+
+  #[serde(default)]
+  kv_namespaces: HashMap<String, KvNamespaceMetadata>,
 }
 
 impl App {
@@ -315,38 +321,6 @@ impl App {
   }
 
   async fn run_deploy(&mut self, spec_file: &PathBuf, vars_file: &Option<PathBuf>) -> Result<()> {
-    #[derive(Error, Debug)]
-    #[error("build failed: return code {0}")]
-    struct BuildFailed(i32);
-
-    #[derive(Error, Debug)]
-    #[error("copy static failed: return code {0}")]
-    struct CopyStaticFailed(i32);
-
-    #[derive(Error, Debug)]
-    #[error("missing env in vars: {0}")]
-    struct MissingEnvInVars(String);
-
-    #[derive(Error, Debug)]
-    #[error("missing mysql in vars: {0}")]
-    struct MissingMysqlInVars(String);
-
-    #[derive(Error, Debug)]
-    #[error("missing apns in vars: {0}")]
-    struct MissingApnsInVars(String);
-
-    #[derive(Error, Debug)]
-    #[error("s3 put error: {0:?} {1}")]
-    struct S3PutError(StatusCode, String);
-
-    #[derive(Error, Debug)]
-    #[error("error reading spec file: {0}")]
-    struct ErrorReadingSpec(std::io::Error);
-
-    #[derive(Error, Debug)]
-    #[error("error reading vars file: {0}")]
-    struct ErrorReadingVars(std::io::Error);
-
     #[derive(Serialize)]
     struct AppUploadRequest {
       appid: String,
@@ -370,10 +344,15 @@ impl App {
       metadata_key: String,
     }
 
-    let spec: DeploySpec =
-      serde_yaml::from_str(&std::fs::read_to_string(spec_file).map_err(ErrorReadingSpec)?)?;
+    let spec: DeploySpec = serde_yaml::from_str(
+      &std::fs::read_to_string(spec_file)
+        .map_err(|e| anyhow::Error::from(e).context("error reading deploy spec"))?,
+    )?;
     let vars: DeployVars = if let Some(vars_file) = vars_file {
-      serde_yaml::from_str(&std::fs::read_to_string(vars_file).map_err(ErrorReadingVars)?)?
+      serde_yaml::from_str(
+        &std::fs::read_to_string(vars_file)
+          .map_err(|e| anyhow::Error::from(e).context("error reading deploy vars"))?,
+      )?
     } else {
       DeployVars::default()
     };
@@ -384,17 +363,22 @@ impl App {
 
     for env in &spec.env {
       if !vars.env.contains_key(env) {
-        return Err(MissingEnvInVars(env.clone()).into());
+        anyhow::bail!("missing env in vars: {}", env);
       }
     }
     for mysql in &spec.mysql {
       if !vars.mysql.contains_key(mysql) {
-        return Err(MissingMysqlInVars(mysql.clone()).into());
+        anyhow::bail!("missing mysql in vars: {}", mysql);
       }
     }
     for apns in &spec.apns {
       if !vars.apns.contains_key(apns) {
-        return Err(MissingApnsInVars(apns.clone()).into());
+        anyhow::bail!("missing apns in vars: {}", apns);
+      }
+    }
+    for kvns in &spec.kv_namespaces {
+      if !vars.kv_namespaces.contains_key(kvns) {
+        anyhow::bail!("missing kvns in vars: {}", kvns);
       }
     }
 
@@ -422,14 +406,14 @@ impl App {
         }
       };
       if !status.success() {
-        return Err(CopyStaticFailed(status.code().unwrap_or(1)).into());
+        anyhow::bail!("copy static failed: {}", status.code().unwrap_or(1));
       }
     }
 
     if let Some(build) = &spec.build {
       let status = Command::new("sh").args(["-c", build.as_str()]).status()?;
       if !status.success() {
-        return Err(BuildFailed(status.code().unwrap_or(1)).into());
+        anyhow::bail!("build failed: {}", status.code().unwrap_or(1));
       }
     }
 
@@ -478,7 +462,7 @@ impl App {
       .await?;
     let status = res.status();
     if !status.is_success() {
-      return Err(S3PutError(status, res.text().await?).into());
+      anyhow::bail!("s3 put error: {} {}", status, res.text().await?);
     }
 
     let md = Metadata {
@@ -487,6 +471,7 @@ impl App {
       env: vars.env,
       mysql: vars.mysql,
       apns: vars.apns,
+      kv_namespaces: vars.kv_namespaces,
     };
     let create_request = AppCreateRequest {
       appid: &upload_request.appid,
