@@ -386,6 +386,13 @@ impl App {
       self.set_endpoint_if_missing(endpoint)?;
     }
 
+    if let Some(build) = &spec.build {
+      let status = Command::new("sh").args(["-c", build.as_str()]).status()?;
+      if !status.success() {
+        anyhow::bail!("build failed: {}", status.code().unwrap_or(1));
+      }
+    }
+
     let td = TempDir::new("bbcli-deploy")?;
     if let Some(d) = &spec._static {
       let status = {
@@ -407,13 +414,6 @@ impl App {
       };
       if !status.success() {
         anyhow::bail!("copy static failed: {}", status.code().unwrap_or(1));
-      }
-    }
-
-    if let Some(build) = &spec.build {
-      let status = Command::new("sh").args(["-c", build.as_str()]).status()?;
-      if !status.success() {
-        anyhow::bail!("build failed: {}", status.code().unwrap_or(1));
       }
     }
 
