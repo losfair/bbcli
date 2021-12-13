@@ -1,7 +1,7 @@
 mod metadata;
 
 use std::{
-  collections::HashMap,
+  collections::{BTreeMap, HashMap},
   io::{ErrorKind, Write},
   os::unix::prelude::OpenOptionsExt,
   path::{Path, PathBuf},
@@ -387,7 +387,15 @@ impl App {
     }
 
     if let Some(build) = &spec.build {
-      let status = Command::new("sh").args(["-c", build.as_str()]).status()?;
+      let mut newenv: BTreeMap<String, String> = std::env::vars().collect();
+      for (k, v) in &vars.env {
+        newenv.insert(format!("BLUEBOAT_{}", k), v.to_string());
+      }
+
+      let status = Command::new("sh")
+        .envs(newenv)
+        .args(["-c", build.as_str()])
+        .status()?;
       if !status.success() {
         anyhow::bail!("build failed: {}", status.code().unwrap_or(1));
       }
