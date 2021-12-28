@@ -41,4 +41,6 @@ pub enum ApnsEndpointMetadata {
 pub struct KvNamespaceMetadata {
   pub shard: String,
   pub prefix: String,
+  #[serde(default)]
+  pub raw: bool,
 }
